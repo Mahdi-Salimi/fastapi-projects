@@ -1,52 +1,56 @@
 from fastapi import FastAPI, HTTPException, status
-from typing import Dict
+from typing import Dict, List
+
+from schema import ExpenseSchema, ExpenseResponseSchema, ExpenseUpdateSchema
 
 app = FastAPI(title="Expense Manager API")
 
 expenses: Dict[int, dict] = {}
 next_id: int = 1 
 
-@app.post("/expenses", status_code=status.HTTP_201_CREATED)
-def create_expense(data: dict):
+
+@app.post("/expenses", response_model=ExpenseResponseSchema, status_code=status.HTTP_201_CREATED)
+def create_expense(data: ExpenseSchema):
     global next_id
 
-    description = data.get("description")
-    amount = data.get("amount")
+    description = data.description
+    amount = data.amount
 
     if description is None or amount is None:
         raise HTTPException(status_code=400, detail="description and amount are required")
 
     expense = {"id": next_id, "description": description, "amount": float(amount)}
+
     expenses[next_id] = expense
     next_id += 1
     return expense
 
 
-@app.get("/expenses")
+@app.get("/expenses", response_model=List[ExpenseResponseSchema], status_code=status.HTTP_200_OK)
 def get_expenses():
     return list(expenses.values())
 
 
-@app.get("/expenses/{expense_id}")
+@app.get("/expenses/{expense_id}", response_model=ExpenseResponseSchema, status_code=status.HTTP_200_OK)
 def get_expense(expense_id: int):
     if expense_id not in expenses:
         raise HTTPException(status_code=404, detail="Expense not found")
     return expenses[expense_id]
 
 
-@app.put("/expenses/{expense_id}")
-def update_expense(expense_id: int, data: dict):
+@app.put("/expenses/{expense_id}", response_model=ExpenseResponseSchema, status_code=status.HTTP_200_OK)
+def update_expense(expense_id: int, data: ExpenseUpdateSchema):
     if expense_id not in expenses:
         raise HTTPException(status_code=404, detail="Expense not found")
 
-    description = data.get("description")
-    amount = data.get("amount")
+    expense = expenses[expense_id]
+    if data.description is not None:
+        expense["description"] = data.description
+    if data.amount is not None:
+        expense["amount"] = float(data.amount)
 
-    if description is None or amount is None:
-        raise HTTPException(status_code=400, detail="description and amount are required")
-
-    expenses[expense_id] = {"id": expense_id, "description": description, "amount": float(amount)}
-    return expenses[expense_id]
+    expenses[expense_id] = expense
+    return expense
 
 
 @app.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
